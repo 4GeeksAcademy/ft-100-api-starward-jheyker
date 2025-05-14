@@ -8,7 +8,8 @@ from flask_swagger import swagger
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from admin import setup_admin
-from models import db, User
+from models import db, User, Favorito, Planet, People
+from sqlalchemy import select
 #from models import Person
 
 app = Flask(__name__)
@@ -36,14 +37,129 @@ def handle_invalid_usage(error):
 def sitemap():
     return generate_sitemap(app)
 
-@app.route('/user', methods=['GET'])
-def handle_hello():
+@app.route("/users", methods=["GET"])
+def get_all_users():
+    stmt = select(User)
+    users = db.session.execute(stmt).scalars().all()
+    return jsonify([user.serialize() for user in users]), 200
 
-    response_body = {
-        "msg": "Hello, this is your GET /user response "
-    }
+@app.route("/people", methods=["GET"])
+def get_people():
+    stmt = select(People)
+    people = db.session.execute(stmt).scalars().all()
+    return jsonify([person.serialize() for person in people]), 200
 
-    return jsonify(response_body), 200
+@app.route("/people/<int:people_id>", methods=["GET"])
+def get_one_person(people_id):
+    stmt = select(People).where(People.id == people_id)
+    person = db.session.execute(stmt).scalar_one_or_none()
+
+    if not person:
+        return jsonify({"message": "People not found"}), 404
+
+    return jsonify(person.serialize()), 200
+
+@app.route("/planets", methods=["GET"])
+def get_planets():
+    stmt = select(Planet)
+    planets = db.session.execute(stmt).scalars().all()
+    return jsonify([planet.serialize() for planet in planets]), 200
+
+@app.route("/planets/<int:planet_id>", methods=["GET"])
+def get_one_planet(planet_id):
+    stmt = select(Planet).where(Planet.id == planet_id)
+    planet = db.session.execute(stmt).scalar_one_or_none()
+
+    if not planet:
+        return jsonify({"message": "Planet not found"}), 404
+
+    return jsonify(planet.serialize()), 200
+
+
+@app.route("/users/favoritos", methods=["GET"])
+def get_user_favoritos():
+    data = request.get_json()
+    user_id = data.get("user_id")
+
+    if not user_id:
+        return jsonify({"message": "user_id is required"}), 400
+
+    stmt = select(Favorito).where(Favorito.user_id == user_id)
+    favoritos = db.session.execute(stmt).scalars().all()
+    return jsonify([f.serialize() for f in favoritos]), 200
+
+@app.route("/favorito/planet/<int:planet_id>", methods=["POST"])
+def agregar_planet_favorito(planet_id):
+    data = request.get_json()
+    user_id = data.get("user_id")
+
+    if not user_id:
+        return jsonify({"message": "user_id is required"}), 400
+
+    stmt_planet = select(Planet).where(Planet.id == planet_id)
+    planet = db.session.execute(stmt_planet).scalar_one_or_none()
+    if not planet:
+        return jsonify({"message": "Planet not found"}), 404
+
+    favorito = Favorito(user_id=user_id, planet_id=planet_id)
+    db.session.add(favorito)
+    db.session.commit()
+    return jsonify(favorito.serialize()), 201
+
+
+@app.route("/favorito/people/<int:people_id>", methods=["POST"])
+def agregar_people_favorito(people_id):
+    data = request.get_json()
+    user_id = data.get("user_id")
+
+    if not user_id:
+        return jsonify({"message": "user_id is required"}), 400
+
+    stmt_people = select(People).where(People.id == people_id)
+    people = db.session.execute(stmt_people).scalar_one_or_none()
+    if not people:
+        return jsonify({"message": "People not found"}), 404
+
+    favorito = Favorito(user_id=user_id, people_id=people_id)
+    db.session.add(favorito)
+    db.session.commit()
+    return jsonify(favorito.serialize()), 201
+
+@app.route("/favorito/planet/<int:planet_id>", methods=["DELETE"])
+def delete_planet_favorito(planet_id):
+    data = request.get_json()
+    user_id = data.get("user_id")
+
+    if not user_id:
+        return jsonify({"message": "user_id is required"}), 400
+
+    stmt = select(Favorito).where(Favorito.user_id == user_id, Favorito.planet_id == planet_id)
+    favorito = db.session.execute(stmt).scalar_one_or_none()
+
+    if not favorito:
+        return jsonify({"message": "Planet favorite not found"}), 404
+
+    db.session.delete(favorito)
+    db.session.commit()
+    return jsonify({"msg": "Planet favorite deleted"}), 200
+
+@app.route("/favorito/people/<int:people_id>", methods=["DELETE"])
+def delete_people_favorito(people_id):
+    data = request.get_json()
+    user_id = data.get("user_id")
+
+    if not user_id:
+        return jsonify({"message": "user_id is required"}), 400
+
+    stmt = select(Favorito).where(Favorito.user_id == user_id, Favorito.people_id == people_id)
+    favorito = db.session.execute(stmt).scalar_one_or_none()
+
+    if not favorito:
+        return jsonify({"message": "People favorite not found"}), 404
+
+    db.session.delete(favorito)
+    db.session.commit()
+    return jsonify({"message": "People favorite deleted"}), 200
 
 # this only runs if `$ python src/app.py` is executed
 if __name__ == '__main__':
