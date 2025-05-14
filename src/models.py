@@ -33,7 +33,6 @@ class People(db.Model):
         return {
             "id": self.id,
             "name": self.name,
-            "favoritos": [fav.user.serialize() for fav in self.favoritos]
         }
 
 class Planet(db.Model):
@@ -45,7 +44,6 @@ class Planet(db.Model):
         return {
             "id": self.id,
             "name": self.name,
-            "favoritos": [fav.user.serialize() for fav in self.favoritos]
         }
     
 class Favorito(db.Model):
